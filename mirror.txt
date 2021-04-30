@@ -1,0 +1,283 @@
+<configuration-text>
+## Last changed: 2021-04-30 06:45:10 PDT
+version 17.2R2.5;
+groups {
+    member0 {
+        system {
+            host-name mirror;
+            backup-router 10.102.175.254;
+        }
+        interfaces {
+            fxp0 {
+                unit 0 {
+                    family inet {
+                        address 10.102.164.222/20;
+                    }
+                }
+            }
+        }
+    }
+    global {
+        system {
+            domain-name englab.juniper.net;
+            domain-search [ englab.juniper.net juniper.net jnpr.net spglab.juniper.net ];
+            time-zone America/Los_Angeles;
+            debugger-on-break;
+            dump-on-panic;
+            authentication-order [ password radius ];
+            root-authentication {
+                encrypted-password "$1$ZUlES4dp$OUwWo1g7cLoV/aMWpHUnC/";
+            }
+            name-server {
+                10.102.149.51;
+                10.102.149.52;
+            }
+            radius-server {
+                192.168.69.162 secret "$9$iHfz9Cu0BRQznCApIRSreWxNVw2GjkKM4JGimP";
+                192.168.64.10 secret "$9$TQ/t1IcSrKAt0IRheK8X7VYgaZDm5zNdiqmTn6";
+                192.168.4.240 secret "$9$GqUqf3nCApOPfQn690ORhSeWL7-boZDylsgoGHk";
+            }
+            login {
+                class wheel {
+                    permissions snmp;
+                }
+                user regress {
+                    uid 928;
+                    class superuser;
+                    shell csh;
+                    authentication {
+                        encrypted-password "$1$kPU..$w.4FGRAGanJ8U4Yq6sbj7.";
+                    }
+                }
+                user remote {
+                    uid 2000;
+                    class super-user;
+                }
+            }
+            services {
+                finger;
+                ftp;
+                rlogin;
+                ssh {
+                    root-login allow;
+                }
+                telnet;
+                xnm-clear-text;
+                netconf {
+                    ssh;
+                }
+            }
+            syslog {
+                host log {
+                    kernel info;
+                    any notice;
+                    pfe info;
+                    interactive-commands any;
+                }
+                file messages {
+                    kernel info;
+                    any notice;
+                    authorization info;
+                    pfe info;
+                    archive world-readable;
+                }
+                file security {
+                    interactive-commands any;
+                    archive world-readable;
+                }
+            }
+            processes {
+                routing enable;
+                ntp enable;
+                management enable;
+                watchdog enable;
+                snmp enable;
+                inet-process enable;
+                mib-process enable;
+            }
+            ntp {
+                boot-server 172.21.200.60;
+                server 172.21.200.60;
+                server 172.29.131.60;
+                server 172.29.135.60;
+            }
+        }
+        chassis {
+            dump-on-panic;
+        }
+        snmp {
+            location "Systest lab";
+            contact "Jay Lloyd";
+            interface fxp0.0;
+            community public {
+                authorization read-only;
+            }
+            community private {
+                authorization read-write;
+            }
+        }
+        routing-options {
+            static {
+                /* corperate and alpha net */
+                route 172.16.0.0/12 {
+                    next-hop 10.102.175.254;
+                    retain;
+                    no-readvertise;
+                }
+                /* eng lab nets */
+                route 192.168.0.0/16 {
+                    next-hop 10.102.175.254;
+                    retain;
+                    no-readvertise;
+                }
+                route 10.0.0.0/8 {
+                    next-hop 10.102.175.254;
+                    retain;
+                    no-readvertise;
+                }
+                /* ntp server */
+                route 66.129.255.62/32 {
+                    next-hop 10.102.175.254;
+                    retain;
+                    no-readvertise;
+                }
+            }
+        }
+    }
+}
+apply-groups [ global member0 ];
+system {
+    ports {
+        console log-out-on-disconnect;
+    }
+}
+chassis {
+    fpc 0 {
+        pic 0 {
+            tunnel-services {
+                bandwidth 10g;
+            }
+        }
+        port-mirror-instance gre;
+        port-mirror-instance double;
+    }
+}
+interfaces {
+    ge-0/0/0 {
+        unit 0 {
+            family inet {
+                filter {
+                    input mirror;
+                    output mirror;
+                }
+                address 192.168.1.1/24;
+            }
+        }
+    }
+    gr-0/0/0 {
+        unit 1 {
+            tunnel {
+                source 3.3.3.3;
+                destination 2.2.2.2;
+            }
+            family inet {
+                address 10.10.10.0/31;
+            }
+        }
+    }
+    ge-0/0/1 {
+        unit 0 {
+            family inet {
+                address 192.168.2.1/31;
+            }
+        }
+    }
+    ge-0/0/2 {
+        unit 0 {
+            family inet {
+                address 192.168.5.1/24;
+            }
+        }
+    }
+    lo0 {
+        unit 0 {
+            family inet {
+                address 3.3.3.3/32;
+            }
+        }
+    }
+}
+forwarding-options {
+    port-mirroring {
+        instance {
+            direct {
+                input {
+                    rate 1;
+                    run-length 1;
+                }
+                family inet {
+                    output {
+                        interface ge-0/0/2.0 {
+                            next-hop 192.168.5.2;
+                        }
+                    }
+                }
+            }
+            gre {
+                input {
+                    rate 1;
+                    run-length 1;
+                }
+                family inet {
+                    output {
+                        interface gr-0/0/0.1;
+                    }
+                }
+            }
+            double {
+                input {
+                    rate 1;
+                    run-length 1;
+                }
+                family inet {
+                    output {
+                        next-hop-group mgroup;
+                    }
+                }
+            }
+        }
+    }
+    next-hop-group mgroup {
+        group-type inet;
+        interface gr-0/0/0.1;
+        interface ge-0/0/2.0 {
+            next-hop 192.168.5.2;
+        }
+    }
+}
+protocols {
+    ospf {
+        area 0.0.0.0 {
+            interface ge-0/0/1.0 {
+                interface-type p2p;
+            }
+            interface lo0.0 {
+                passive;
+            }
+        }
+    }
+}
+firewall {
+    family inet {
+        filter mirror {
+            term mirror {
+                then {
+                    count mirrored;
+                    port-mirror-instance double;
+                    accept;
+                }
+            }
+        }
+    }
+}
+</configuration-text>
